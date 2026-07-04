@@ -1,0 +1,9 @@
+<resources>
+
+    <style name="Theme.NSEClock" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/scr_bg</item>
+        <item name="android:statusBarColor">@color/scr_bg</item>
+        <item name="android:navigationBarColor">@color/scr_bg</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
+</resources>

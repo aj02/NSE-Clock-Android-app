@@ -1,0 +1,13 @@
+{
+  "_note": "NSE trading holidays. Only verified fixed-date national holidays are pre-filled. Replace/extend each year from the official NSE circular: https://www.nseindia.com/resources/exchange-communication-holidays . Dates that fall on Sat/Sun are ignored anyway. Format: YYYY -> [\"YYYY-MM-DD\", ...].",
+  "2026": [
+    "2026-01-26",
+    "2026-10-02",
+    "2026-12-25"
+  ],
+  "2027": [
+    "2027-01-26",
+    "2027-08-15",
+    "2027-10-02"
+  ]
+}
