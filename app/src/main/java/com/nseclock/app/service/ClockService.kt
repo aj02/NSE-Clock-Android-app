@@ -61,7 +61,7 @@ class ClockService : Service() {
     override fun onCreate() {
         super.onCreate()
         createChannels()
-        goForeground(buildOngoing("NSE Clock", "Starting…"))
+        goForeground(buildOngoing("NSE Clock by AjAi", "Starting…"))
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -121,8 +121,8 @@ class ClockService : Service() {
         return PendingIntent.getActivity(this, 0, i, PendingIntent.FLAG_IMMUTABLE)
     }
 
-    private fun buildOngoing(title: String, text: String): Notification =
-        NotificationCompat.Builder(this, CH_ONGOING)
+    private fun buildOngoing(title: String, text: String, whenMs: Long? = null): Notification {
+        val b = NotificationCompat.Builder(this, CH_ONGOING)
             .setSmallIcon(R.drawable.ic_stat_bell)
             .setContentTitle(title)
             .setContentText(text)
@@ -130,7 +130,17 @@ class ClockService : Service() {
             .setContentIntent(contentPi())
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
-            .build()
+        if (whenMs != null && whenMs > System.currentTimeMillis()) {
+            // System-driven live countdown to the next beep (no repaint / no wakeups).
+            b.setWhen(whenMs)
+                .setShowWhen(true)
+                .setUsesChronometer(true)
+                .setChronometerCountDown(true)
+        } else {
+            b.setShowWhen(false)
+        }
+        return b.build()
+    }
 
     private fun goForeground(n: Notification) {
         if (Build.VERSION.SDK_INT >= 34) {
@@ -153,10 +163,10 @@ class ClockService : Service() {
         val title = when {
             !prefs.enabled -> "NSE Clock — paused"
             prefs.isMutedToday(Time.nowIst().toLocalDate()) -> "NSE Clock — muted today"
-            else -> "NSE Clock"
+            else -> "NSE Clock by AjAi"
         }
         getSystemService(NotificationManager::class.java)
-            .notify(NOTIF_ONGOING, buildOngoing(title, text))
+            .notify(NOTIF_ONGOING, buildOngoing(title, text, next?.epochMillis))
     }
 
     private fun notifyAlert(type: BeepType) {

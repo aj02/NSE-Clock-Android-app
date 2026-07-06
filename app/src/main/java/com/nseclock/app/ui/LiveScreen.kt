@@ -3,10 +3,10 @@ package com.nseclock.app.ui
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -17,11 +17,14 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -31,7 +34,6 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.nseclock.app.model.BeepType
 
 private val Mono = FontFamily.Monospace
 
@@ -46,34 +48,55 @@ fun LiveScreen(
         containerColor = ScrBg,
         bottomBar = { FooterBar(ui, onToggleEnabled, onMuteToday) }
     ) { pad ->
-        LazyColumn(
+        Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(pad)
-                .padding(horizontal = 18.dp),
-            contentPadding = PaddingValues(top = 8.dp, bottom = 12.dp)
+                .padding(horizontal = 18.dp)
         ) {
-            item { AppHeader(onOpenSetup) }
-            item { StatePill(ui.state); Spacer(Modifier.height(14.dp)) }
-            item { HeroCard(ui); Spacer(Modifier.height(8.dp)) }
-
-            item {
-                SectionLabel(
-                    left = "Today · ${ui.dateLine}",
-                    right = if (ui.totalCount > 0) "${ui.doneCount} / ${ui.totalCount} done" else null
-                )
+            AppHeader(onOpenSetup)
+            StatePill(ui.state)
+            Spacer(Modifier.height(14.dp))
+            HeroCard(ui)
+            Spacer(Modifier.height(4.dp))
+            SectionLabel(
+                left = "Today · ${ui.dateLine}",
+                right = if (ui.totalCount > 0) "${ui.doneCount} / ${ui.totalCount} done" else null
+            )
+            // Fixed-height viewport that fills the space to the footer.
+            // The NEXT event is auto-centered; scroll to see the rest.
+            Box(Modifier.weight(1f).fillMaxWidth()) {
+                if (ui.rows.isEmpty()) ClosedCard(ui) else Timeline(ui.rows)
             }
-
-            if (ui.rows.isEmpty()) {
-                item { ClosedCard(ui) }
-            } else {
-                items(ui.rows) { row -> TimelineRow(row) }
-            }
-
-            item { SectionLabel(left = "Alert sounds", right = null); Spacer(Modifier.height(4.dp)) }
-            item { LegendGrid() }
-            item { Spacer(Modifier.height(8.dp)) }
+            Spacer(Modifier.height(6.dp))
         }
+    }
+}
+
+@Composable
+private fun Timeline(rows: List<EventRow>) {
+    val listState = rememberLazyListState()
+    val nextIndex = remember(rows) { rows.indexOfFirst { it.isNext } }
+
+    // Re-center only when the NEXT row changes (every 5 min), not every second.
+    LaunchedEffect(nextIndex) {
+        if (nextIndex >= 0) {
+            listState.scrollToItem(nextIndex)              // bring into view + measure
+            val info = listState.layoutInfo
+            val item = info.visibleItemsInfo.firstOrNull { it.index == nextIndex }
+            if (item != null) {
+                val viewportCenter = (info.viewportStartOffset + info.viewportEndOffset) / 2f
+                val itemCenter = item.offset + item.size / 2f
+                listState.animateScrollBy(itemCenter - viewportCenter)
+            }
+        }
+    }
+
+    LazyColumn(
+        state = listState,
+        modifier = Modifier.fillMaxSize()
+    ) {
+        items(rows) { row -> TimelineRow(row) }
     }
 }
 
@@ -95,10 +118,16 @@ private fun AppHeader(onOpenSetup: () -> Unit) {
                 contentAlignment = Alignment.Center
             ) { Text("◆", color = Accent, fontSize = 12.sp) }
             Spacer(Modifier.width(9.dp))
-            Text(
-                "NSE CLOCK",
-                color = ScrFg, fontSize = 13.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.6.sp
-            )
+            Column {
+                Text(
+                    "NSE CLOCK",
+                    color = ScrFg, fontSize = 13.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.6.sp
+                )
+                Text(
+                    "by AjAi",
+                    color = Accent, fontSize = 9.5.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 1.sp
+                )
+            }
         }
         Text(
             "⚙",
@@ -178,7 +207,7 @@ private fun SectionLabel(left: String, right: String?) {
     Row(
         Modifier
             .fillMaxWidth()
-            .padding(top = 20.dp, bottom = 8.dp),
+            .padding(top = 18.dp, bottom = 8.dp),
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
         Text(left.uppercase(), color = ScrMuted, fontSize = 11.sp,
@@ -191,7 +220,7 @@ private fun SectionLabel(left: String, right: String?) {
 @Composable
 private fun TimelineRow(row: EventRow) {
     val bg = if (row.isNext)
-        Brush.horizontalGradient(listOf(Accent.copy(alpha = 0.10f), Color.Transparent))
+        Brush.horizontalGradient(listOf(Accent.copy(alpha = 0.12f), Color.Transparent))
     else Brush.horizontalGradient(listOf(Color.Transparent, Color.Transparent))
 
     Row(
@@ -199,7 +228,7 @@ private fun TimelineRow(row: EventRow) {
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
             .background(bg)
-            .padding(horizontal = 4.dp, vertical = 9.dp),
+            .padding(horizontal = 4.dp, vertical = 11.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
@@ -210,7 +239,7 @@ private fun TimelineRow(row: EventRow) {
         Spacer(Modifier.width(10.dp))
         Box(
             Modifier
-                .size(11.dp)
+                .size(if (row.isNext) 13.dp else 11.dp)
                 .clip(CircleShape)
                 .background(if (row.done) Scr2 else colorFor(row.type))
         )
@@ -249,46 +278,11 @@ private fun ClosedCard(ui: LiveUi) {
 }
 
 @Composable
-private fun LegendGrid() {
-    val items = listOf(
-        Triple(BeepType.OPEN, "Open", "09:00 · rising 2-tone"),
-        Triple(BeepType.START, "Start", "09:15 · triple chime"),
-        Triple(BeepType.CANDLE, "Candle", "5-min · short tick"),
-        Triple(BeepType.CLOSE, "Close", "15:30 · long low")
-    )
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        items.chunked(2).forEach { pair ->
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                pair.forEach { (type, name, sub) ->
-                    Row(
-                        Modifier
-                            .weight(1f)
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(Scr1)
-                            .border(1.dp, ScrLine, RoundedCornerShape(12.dp))
-                            .padding(horizontal = 11.dp, vertical = 9.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Box(Modifier.size(9.dp).clip(RoundedCornerShape(3.dp)).background(colorFor(type)))
-                        Spacer(Modifier.width(9.dp))
-                        Column {
-                            Text(name, color = ScrFg, fontSize = 12.5.sp, fontWeight = FontWeight.SemiBold)
-                            Text(sub, color = ScrMuted, fontFamily = Mono, fontSize = 10.5.sp)
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
 private fun FooterBar(ui: LiveUi, onToggle: () -> Unit, onMute: () -> Unit) {
     Row(
         Modifier
             .fillMaxWidth()
             .background(ScrBg)
-            .border(0.dp, Color.Transparent)
             .padding(16.dp),
         horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
