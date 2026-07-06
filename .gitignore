@@ -8,3 +8,7 @@
 .externalNativeBuild
 .cxx
 /app/build/
+*.apk
+*.aab
+*.keystore
+*.jks
